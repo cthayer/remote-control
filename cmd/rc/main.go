@@ -23,7 +23,7 @@ var (
 	// #!/usr/bin/env bash
 	// version=2
 	// time=$(date)
-	// go build -ldflags="-X 'main.BuildTime=$time' -X 'main.BuildVersion=$version'" .
+	// go build -ldflags="-X 'main.BuildTime=$time' -X 'main.VERSION=$version'" .
 	VERSION = "dev"
 )
 
