@@ -45,6 +45,8 @@ func Tidy() error {
 }
 
 func Build() error {
+	var err error
+
 	target := os.Getenv("TARGET")
 	version := os.Getenv("VERSION")
 
@@ -56,17 +58,21 @@ func Build() error {
 		return errors.New("must set the 'TARGET' environment variable to one of: 'rc' or 'remote-control'")
 	}
 
-	fmt.Println("building " + target)
+	err = buildBinary(target, version)
 
-	cmdArgs := []string{
-		"-output", "build/bin/{{.OS}}_{{.Arch}}_" + version + "/{{.Dir}}",
-		"-ldflags", "-X 'main.VERSION=" + version + "'",
-		"./cmd/" + target,
+	if err != nil {
+		return err
 	}
 
-	out, err := sh.OutCmd("gox", cmdArgs...)()
+	// create SHA256 sums
+	err = getBinarySha256Sum(target, version)
 
-	fmt.Println(out)
+	if err != nil {
+		return err
+	}
+
+	// create zip archives for each platform
+	err = compressBinary(target, version)
 
 	return err
 }
