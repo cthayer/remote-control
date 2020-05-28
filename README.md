@@ -17,106 +17,95 @@ openssl genrsa -out foo.key 4096
 openssl rsa -pubout -in foo.key -out foo
 ```
 
-Clients
+#### Platform/Arch Support
+
+The following platforms are supported:
+
+```text
+darwin/386
+darwin/amd64
+freebsd/386
+freebsd/amd64
+freebsd/arm
+linux/386
+linux/amd64
+linux/arm
+linux/arm64
+linux/mips64
+linux/mips64le
+linux/mips
+linux/mipsle
+linux/s390x
+netbsd/386
+netbsd/amd64
+netbsd/arm
+openbsd/386
+openbsd/amd64
+windows/386
+windows/amd64
+```
+
+Server
 -------------------
 
-[rc-client](https://github.com/sazze/node-rc-client) is the official client library for interacting with this service.
+`remote-control` is the server.  It is meant to be run on the host(s) where you want commands to be executed.
+
+It is recommended to use `systemd` or your favorite init service to run the server.
+
+Client
+-------------------
+
+`rc` is the client.  It is meant to be run from a command line and send a command to hosts running the `remote-control` service.
+
+You can use this command line tool to run a command against many servers by piping a newline delimited list of servers to the command via STDIN.
+
+For example:
+```bash
+cat hosts.txt | rc "uname -a" -c /path/to/config.json
+```
+
+You can also import the `pkg/client` and `pkg/client_config` modules into your golang project if you'd like to integrate a client directly into another project.
 
 Installation
 -------------------
-**RPM:**
 
-`yum install remote-control`
+### Server
 
-*Note: creation of an RPM package is still on the TODO list
+* Download the `remote-control` zip archive appropriate for your system from the [releases](https://github.com/cthayer/go-remote-control/releases)
+* Unzip the archive.  This will produce a binary file named `remote-control`
+* (optional) Verify the file's SHA256 checksum
+* (optional) Move the `remote-control` file to `/usr/local/bin` or a well-known path for executables that's platform appropriate.
 
-**Other:**
-
-* Download the `remote-control` binary file appropriate for your system (linux/MacOS(darwin)) from the [releases](https://github.com/cthayer/go-remote-control/releases)
-* Make the downloaded file executable
-
-**Example Init Script (RedHat/Centos):**
+**Example Systemd Unit File:**
 
 ```bash
-#!/bin/bash
-#
-#	/etc/rc.d/init.d/rc
-#
-#	This is a service that allows command line commands to be run on the host it is running on.
-#
-# chkconfig: 2345 20 80
-# description: This is a service that allows command line commands to be run on the host it is running on.
-# processname: rc
-# config: /etc/rc/config.json
-# pidfile: /var/run/rc.pid
-#
+[Unit]
+Description=remote-control service
+Requires=network-online.target
+Wants=network-online.target
+After=network-online.target
 
-# Source function library.
-. /etc/init.d/functions
-
-PROGNAME=rc
-PROG=/usr/local/sbin/$PROGNAME
-PIDFILE=/var/run/${PROGNAME}.pid
-CONFIGFILE=/etc/$PROGNAME/config.json
-LOCKFILE=/var/lock/subsys/$PROGNAME
-
-start() {
-    if [ -d /.nar ]; then
-        # ensure clean start (nar agressively caches code)
-        rm -rf /.nar
-    fi
-    
-	echo -n "Starting $PROGNAME: "
-	daemon $PROG --configFile $CONFIGFILE
-	ret=$?
-	echo ""
-	touch $LOCKFILE
-	return $ret
-}
-
-stop() {
-	echo -n "Shutting down $PROGNAME: "
-	killproc -p $PIDFILE $PROG
-	ret=$?
-	echo ""
-	rm -f $LOCKFILE
-	return $ret
-}
-
-case "$1" in
-    start)
-	start
-	;;
-    stop)
-	stop
-	;;
-    status)
-	status -p $PIDFILE -l $LOCKFILE
-	;;
-    restart)
-    stop
-	start
-	;;
-    *)
-	echo "Usage: <servicename> {start|stop|status|reload|restart[|probe]"
-	exit 1
-	;;
-esac
-exit $?
+[Service]
+User=root
+Group=root
+ExecStart=/usr/local/bin/remote-control
+ExecReload=/bin/kill -HUP \$MAINPID
+KillMode=process
+KillSignal=SIGTERM
+Restart=on-failure
+RestartSec=5s
+Environment=RC_CONFIGFILE=/etc/remote-control/config.json
+[Install]
+WantedBy=multi-user.target
 ```
 
-**Example Systemd Unit:**
+#### Configuration
 
-```bash
-TODO
+Configuration is specified in a JSON formatted file and passed to the service using the `--config-file` command line flag or the `RC_CONFIGFILE` environment variable.
+
+Run the following command to see full usage information:
 ```
-
-Configuration
--------------------
-Configuration is specified in a JSON formated file and passed to the service using the `-configFile` command line flag.
-
-```
-remote-control [-configFile FILE] [-version]
+remote-control --help
 ```
 
 The configuration file understands the following options:
@@ -137,26 +126,93 @@ The signature header should be in the following format:
 
 `Authorization: RC <name>;<iso_8601_timestamp>;<signature>`
 
-* `<name>`: the server will verfiy the signature using a certificate stored in `<certDir>/<name>.key` on the server
+* `<name>`: the server will verify the signature using a certificate stored in `<certDir>/<name>.key` on the server
 * `<iso_8601_timestamp>`: an `ISO-8601` formatted timestamp.  This is the data that has been signed
 * `<sig>`: a `RSA-SHA256` signature in `base64` format
 
-### Environment Variables
+##### Environment Variables
 
-* `DEBUG`: sets the level(s) for logging (default: `error,warn,info`).  `main` and `server` levels are also available for verbose logging.
+All options from the configuration file can be passed as environment variables by prefixing the configuration file key name with `RC_` and converting to all capital letters.
+
+### Client
+
+* Download the `rc` zip archive appropriate for your system from the [releases](https://github.com/cthayer/go-remote-control/releases)
+* Unzip the archive.  This will produce a binary file named `rc`
+* (optional) Verify the file's SHA256 checksum
+* (optional) Move the `rc` file to `/usr/local/bin` or a well-known path for executables that's platform appropriate.
+
+#### Configuration
+
+Configuration is specified in a JSON formatted file and passed to the service using the `--config-file` command line flag or the `RC_CONFIGFILE` environment variable.
+
+Run the following command to see full usage information:
+```
+rc --help
+```
+
+The configuration file understands the following options:
+
+* `port`: the port to listen on (default: `4515`)
+* `host`: the interface to bind to (default: `::`)
+* `keyDir`: the directory where your private key is stored
+* `keyName`: the name of the file of the private key to use (without the `.key` extension)
+* `logLevel`: the level of logging to display.  Can be one of: error, warn, info, debug (default: info)
+* `batchSize`: the max number of servers to run the command on in parallel (default: 5)
+* `delay`: the number of milliseconds to wait between batches (default: 0)
+* `verbose`: set to `1` to show the raw rc-protocol response from the server(s)
+* `retry`: the number of times to retry connecting to a server if the first attempt fails (default: 0)
+
+The server authenticates clients by requiring that they provide a signature in the `Authorization` header on the initial upgrade request.
+
+The signature header should be in the following format:
+
+`Authorization: RC <name>;<iso_8601_timestamp>;<signature>`
+
+* `<name>`: the server will verify the signature using a certificate stored in `<certDir>/<name>.key` on the server
+* `<iso_8601_timestamp>`: an `ISO-8601` formatted timestamp.  This is the data that has been signed
+* `<sig>`: a `RSA-SHA256` signature in `base64` format
+
+##### Environment Variables
+
+All options from the configuration file can be passed as environment variables by prefixing the configuration file key name with `RC_` and converting to all capital letters.
 
 Testing
 -------------------
 
-You can test client actions with `test/scripts/client.js`
+[Mage](https://magefile.org/) is used for running tests.  It must be installed on the system running tests.
 
-**NOTES:** 
+To run tests:
+```bash
+mage test
+```
 
-* set the `RC_CERT_NAME` and `RC_CERT_DIR` environment variables before running the client test script.
-* place your public key in `/tmp/rcPubKeys`
-* run the server: `node app.js --configFile ./test/config/config.json`
+Building
+-------------------
 
-### Environment Variables
+[Mage](https://magefile.org/) and [gox](https://github.com/mitchellh/gox) are used for building binaries.  They must be installed on the system running the build.
 
-* `RC_CERT_NAME`: the name of the cert for the client to use for authorization (see `name` in the config options)
-* `RC_CERT_DIR`: the path to the directory that contains the cert
+There are two binaries that can be built: 1) `rc`, the client binary and 2) `remote-control` the server binary.
+
+To build `rc` (the client binary):
+```bash
+build/build.sh rc
+```
+
+To build `remote-control` (the server binary):
+```bash
+build/build.sh remote-control
+```
+
+The binaries, zip archives, and SHA256 checksum files will be written to the `build/bin` directory.
+
+### Cleaning up
+
+To clean up the results of a build and start fresh, run the following command:
+
+```bash
+mage clean
+```
+
+### Version
+
+Set the version for a binary by editing the `build/versions.json` file.
