@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/cthayer/remote_control/internal/config"
 	"os"
 	"os/signal"
 	"syscall"
@@ -8,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/cthayer/remote_control/internal/config"
 	"github.com/cthayer/remote_control/internal/logger"
 	"github.com/cthayer/remote_control/internal/server"
 )
@@ -17,7 +17,23 @@ const (
 	SERVER_START_TIMEOUT = 120
 )
 
+var (
+	// #!/usr/bin/env bash
+	// version=2
+	// time=$(date)
+	// go build -ldflags="-X 'main.BuildTime=$time' -X 'main.VERSION=$version'" .
+	VERSION = "dev"
+)
+
 func main() {
+	cmdErr := cliRootCmd.Execute()
+
+	if cmdErr != nil {
+		os.Exit(1)
+	}
+}
+
+func runServer() {
 	// load configuration
 	if err := initializeConfig(); err != nil {
 		_, _ = os.Stderr.WriteString("Failed to load configuration\n")
@@ -29,8 +45,17 @@ func main() {
 
 	log.Info("Configuration Loaded")
 
+	conf := config.GetConfig()
+	
+	conf.Port =          cliConf.Port
+	conf.Host =          cliConf.Host
+	conf.CertDir =       cliConf.CertDir
+	conf.Ciphers =       cliConf.Ciphers
+	conf.PidFile =       cliConf.PidFile
+	conf.LogLevel =      cliConf.LogLevel
+
 	// start server
-	srv := server.NewServer(config.GetConfig())
+	srv := server.NewServer(conf)
 
 	errChan := srv.Start()
 

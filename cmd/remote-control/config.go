@@ -1,50 +1,111 @@
 package main
 
 import (
-	"github.com/cthayer/remote_control/internal/config"
-	"github.com/cthayer/remote_control/internal/logger"
+	"os"
+
 	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"os"
+
+	"github.com/cthayer/remote_control/internal/config"
+	"github.com/cthayer/remote_control/internal/logger"
 )
 
+const (
+	DEFAULT_CLI_CONF_PID_FILE = ""
+	DEFAULT_CLI_CONF_CONFIG_FILE = ""
+)
+
+var cliRootCmd = cobra.Command{
+	Use:     "remote-control",
+	Short:   "Runs the remote-control service which allows remote commands to be executed on the system using the rc-protocol",
+	Long:    "Runs the remote-control service\n\nThis allows clients to use the rc-protocol to send\n remote commands to be executed on the system",
+	Example: "  remote-control -c /path/to/config.json",
+	Args:    cobra.ExactArgs(0),
+	Version: VERSION,
+	Run: func(cmd *cobra.Command, args []string) {
+		runServer()
+	},
+}
+
+type cliConfig struct {
+	ConfigFile string
+	Port int
+	CertDir string
+	Ciphers string
+	LogLevel string
+	Host string
+	PidFile string
+}
+
+var cliConf cliConfig = cliConfig{
+	ConfigFile: DEFAULT_CLI_CONF_CONFIG_FILE,
+	Port:       config.DEFAULT_PORT,
+	CertDir:     config.DEFAULT_CERT_DIR,
+	Ciphers:    config.DEFAULT_CIPHERS,
+	LogLevel:   config.DEFAULT_LOG_LEVEL,
+	Host:  config.DEFAULT_HOST,
+	PidFile:    DEFAULT_CLI_CONF_PID_FILE,
+}
+
 func init() {
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.ConfigFile, "config-file", "c", DEFAULT_CLI_CONF_CONFIG_FILE, "path to JSON formatted configuration file")
+	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Port, "port", "p", config.DEFAULT_PORT, "port to listen on")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.CertDir, "cert-dir", "d", config.DEFAULT_CERT_DIR, "path to the folder that contains authorized client public keys")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.Ciphers, "ciphers", "", config.DEFAULT_CIPHERS, "the list of ciphers to use for TLS encryption")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.LogLevel, "log-level", "", config.DEFAULT_LOG_LEVEL, "the loglevel.  can be one of: error, warn, info, debug")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.PidFile, "pid-file", "", DEFAULT_CLI_CONF_PID_FILE, "the file to write the pid to (used for initv style services")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.Host, "host", "H", config.DEFAULT_HOST, "the host address to bind to")
+
 	// Default configuration settings
-	viper.SetDefault("configFile", "")
-	viper.SetDefault("port", 4515)
-	viper.SetDefault("host", "")
-	viper.SetDefault("certDir", "/etc/rc/certs")
-	viper.SetDefault("ciphers", "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS !RC4")
-	viper.SetDefault("pidFile", "")
-	viper.SetDefault("engineOptions.pingTimeout", 5000)
-	viper.SetDefault("engineOptions.pingInterval", 1000)
-	viper.SetDefault("logLevel", "info")
+	viper.SetDefault("configFile", DEFAULT_CLI_CONF_CONFIG_FILE)
+	viper.SetDefault("port", config.DEFAULT_PORT)
+	viper.SetDefault("host", config.DEFAULT_HOST)
+	viper.SetDefault("certDir", config.DEFAULT_CERT_DIR)
+	viper.SetDefault("ciphers", config.DEFAULT_CIPHERS)
+	viper.SetDefault("pidFile", DEFAULT_CLI_CONF_PID_FILE)
+	viper.SetDefault("logLevel", config.DEFAULT_LOG_LEVEL)
 
 	// Environment Variables
 	viper.SetEnvPrefix("RC")
 	_ = viper.BindEnv("configFile")
 	_ = viper.BindEnv("certDir")
 	_ = viper.BindEnv("logLevel")
+	_ = viper.BindEnv("host")
+	_ = viper.BindEnv("port")
+	_ = viper.BindEnv("pidFile")
+	_ = viper.BindEnv("ciphers")
 
 	// Flags
-	pflag.String("configFile", "", "path to JSON formatted configuration file")
-	pflag.String("certDir", "", "path to JSON formatted configuration file")
-	pflag.BoolP("version", "v", false, "display version information")
-	pflag.BoolP("help", "h", false, "display help information")
-	_ = viper.BindPFlags(pflag.CommandLine)
+	_ = viper.BindPFlag("configFile", cliRootCmd.PersistentFlags().Lookup("config-file"))
+	_ = viper.BindPFlag("certDir", cliRootCmd.PersistentFlags().Lookup("cert-dir"))
+	_ = viper.BindPFlag("logLevel", cliRootCmd.PersistentFlags().Lookup("log-level"))
+	_ = viper.BindPFlag("host", cliRootCmd.PersistentFlags().Lookup("host"))
+	_ = viper.BindPFlag("port", cliRootCmd.PersistentFlags().Lookup("port"))
+	_ = viper.BindPFlag("pidFile", cliRootCmd.PersistentFlags().Lookup("pid-file"))
+	_ = viper.BindPFlag("ciphers", cliRootCmd.PersistentFlags().Lookup("ciphers"))
 
 	// Config File
 	viper.SetConfigType("json")
 }
 
 func initializeConfig() error {
-	if configFile := viper.GetString("configFile"); configFile != "" {
+	// update the config struct
+	if err := updateConfig(); err != nil {
+		return err
+	}
+
+	if cliConf.ConfigFile != "" {
 		// read config file
-		viper.SetConfigFile(configFile)
+		viper.SetConfigFile(cliConf.ConfigFile)
 
 		if err := viper.ReadInConfig(); err != nil {
+			return err
+		}
+
+		// update the config struct
+		if err := updateConfig(); err != nil {
 			return err
 		}
 
@@ -58,13 +119,13 @@ func initializeConfig() error {
 		viper.WatchConfig()
 	}
 
-	// update the config struct
-	if err := updateConfig(); err != nil {
-		return err
-	}
-
 	// initialize the logger
-	_, err := logger.InitLogger(config.GetConfig().LogLevel)
+	log, err := logger.InitLogger(config.GetConfig().LogLevel)
+
+	if err == nil && log != nil {
+		log.Debug("Configuration File: " + cliConf.ConfigFile)
+		log.Debug("", zap.Any("cliConf", cliConf))
+	}
 
 	return err
 }
@@ -97,5 +158,5 @@ func reloadConfig() {
 }
 
 func updateConfig() error {
-	return viper.Unmarshal(config.GetConfig())
+	return viper.Unmarshal(&cliConf)
 }
