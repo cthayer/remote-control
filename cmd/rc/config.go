@@ -13,7 +13,7 @@ const (
 	DEFAULT_CLI_CONF_CONFIG_FILE = ""
 	DEFAULT_CLI_CONF_BATCH_SIZE  = 5
 	DEFAULT_CLI_CONF_DELAY       = 0
-	DEFAULT_CLI_CONF_VERBOSE     = 0
+	DEFAULT_CLI_CONF_VERBOSE     = false
 	DEFAULT_CLI_CONF_RETRY       = 0
 )
 
@@ -30,27 +30,33 @@ var cliRootCmd = cobra.Command{
 }
 
 type cliConfig struct {
-	ConfigFile string `json:"configFile"`
-	Port       int    `json:"port"`
-	KeyDir     string `json:"keyDir"`
-	KeyName    string `json:"keyName"`
-	LogLevel   string `json:"logLevel"`
-	BatchSize  int    `json:"batchSize"`
-	Delay      int    `json:"delay"`
-	Verbose    int    `json:"verbose"`
-	Retry      int    `json:"retry"`
+	ConfigFile    string `json:"configFile"`
+	Port          int    `json:"port"`
+	KeyDir        string `json:"keyDir"`
+	KeyName       string `json:"keyName"`
+	LogLevel      string `json:"logLevel"`
+	BatchSize     int    `json:"batchSize"`
+	Delay         int    `json:"delay"`
+	Verbose       bool   `json:"verbose"`
+	Retry         int    `json:"retry"`
+	TlsSkipVerify bool   `json:"tlsSkipVerify"`
+	TlsCaFile     string `json:"tlsCaFile"`
+	TlsDisable    bool   `json:"tlsDisable"`
 }
 
 var cliConf cliConfig = cliConfig{
-	ConfigFile: DEFAULT_CLI_CONF_CONFIG_FILE,
-	Port:       config.DEFAULT_PORT,
-	KeyDir:     config.DEFAULT_KEY_DIR,
-	KeyName:    config.DEFAULT_KEY_NAME,
-	LogLevel:   config.DEFAULT_LOG_LEVEL,
-	BatchSize:  DEFAULT_CLI_CONF_BATCH_SIZE,
-	Verbose:    DEFAULT_CLI_CONF_VERBOSE,
-	Delay:      DEFAULT_CLI_CONF_DELAY,
-	Retry:      DEFAULT_CLI_CONF_RETRY,
+	ConfigFile:    DEFAULT_CLI_CONF_CONFIG_FILE,
+	Port:          config.DEFAULT_PORT,
+	KeyDir:        config.DEFAULT_KEY_DIR,
+	KeyName:       config.DEFAULT_KEY_NAME,
+	LogLevel:      config.DEFAULT_LOG_LEVEL,
+	BatchSize:     DEFAULT_CLI_CONF_BATCH_SIZE,
+	Verbose:       DEFAULT_CLI_CONF_VERBOSE,
+	Delay:         DEFAULT_CLI_CONF_DELAY,
+	Retry:         DEFAULT_CLI_CONF_RETRY,
+	TlsCaFile:     config.DEFAULT_TLS_CA_FILE,
+	TlsSkipVerify: config.DEFAULT_TLS_SKIP_VERIFY,
+	TlsDisable:    config.DEFAULT_TLS_DISABLE,
 }
 
 func init() {
@@ -61,8 +67,11 @@ func init() {
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.LogLevel, "log-level", "", config.DEFAULT_LOG_LEVEL, "the loglevel.  can be one of: error, warn, info, debug")
 	cliRootCmd.PersistentFlags().IntVarP(&cliConf.BatchSize, "batch-size", "b", DEFAULT_CLI_CONF_BATCH_SIZE, "the max number of hosts to send the command to at once while reading")
 	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Delay, "delay", "d", DEFAULT_CLI_CONF_DELAY, "the time to wait between batches (in ms)")
-	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Verbose, "verbose", "", DEFAULT_CLI_CONF_VERBOSE, "set to 1 to display raw response information")
+	cliRootCmd.PersistentFlags().BoolVarP(&cliConf.Verbose, "verbose", "", DEFAULT_CLI_CONF_VERBOSE, "set to 1 to display raw response information")
 	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Retry, "retry", "r", DEFAULT_CLI_CONF_RETRY, "number of times to retry a failed connection before giving up")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.TlsCaFile, "tls-ca-file", "", config.DEFAULT_TLS_CA_FILE, "path to the ca certificate file to use")
+	cliRootCmd.PersistentFlags().BoolVarP(&cliConf.TlsSkipVerify, "tls-skip-verify", "", config.DEFAULT_TLS_SKIP_VERIFY, "skip verification of the server certificate")
+	cliRootCmd.PersistentFlags().BoolVarP(&cliConf.TlsDisable, "tls-disable", "", config.DEFAULT_TLS_DISABLE, "don't use TLS when connecting to the server")
 
 	// Default configuration settings
 	viper.SetDefault("configFile", DEFAULT_CLI_CONF_CONFIG_FILE)
@@ -74,6 +83,9 @@ func init() {
 	viper.SetDefault("delay", DEFAULT_CLI_CONF_DELAY)
 	viper.SetDefault("verbose", DEFAULT_CLI_CONF_VERBOSE)
 	viper.SetDefault("retry", DEFAULT_CLI_CONF_RETRY)
+	viper.SetDefault("tlsCaFile", config.DEFAULT_TLS_CA_FILE)
+	viper.SetDefault("tlsSkipVerify", config.DEFAULT_TLS_SKIP_VERIFY)
+	viper.SetDefault("tlsDisable", config.DEFAULT_TLS_DISABLE)
 
 	// Environment Variables
 	viper.SetEnvPrefix("RC")
@@ -86,6 +98,9 @@ func init() {
 	_ = viper.BindEnv("delay")
 	_ = viper.BindEnv("verbose")
 	_ = viper.BindEnv("retry")
+	_ = viper.BindEnv("tlsCaFile")
+	_ = viper.BindEnv("tlsSkipVerify")
+	_ = viper.BindEnv("tlsDisable")
 
 	// Flags
 	_ = viper.BindPFlag("configFile", cliRootCmd.PersistentFlags().Lookup("config-file"))
@@ -97,6 +112,9 @@ func init() {
 	_ = viper.BindPFlag("delay", cliRootCmd.PersistentFlags().Lookup("delay"))
 	_ = viper.BindPFlag("verbose", cliRootCmd.PersistentFlags().Lookup("verbose"))
 	_ = viper.BindPFlag("retry", cliRootCmd.PersistentFlags().Lookup("retry"))
+	_ = viper.BindPFlag("tlsSkipVerify", cliRootCmd.PersistentFlags().Lookup("tls-skip-verify"))
+	_ = viper.BindPFlag("tlsCaFile", cliRootCmd.PersistentFlags().Lookup("tls-ca-file"))
+	_ = viper.BindPFlag("tlsDisable", cliRootCmd.PersistentFlags().Lookup("tls-disable"))
 
 	// Config File
 	viper.SetConfigType("json")

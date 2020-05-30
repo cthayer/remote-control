@@ -1,14 +1,16 @@
 package main
 
 import (
-	"github.com/cthayer/remote_control/internal/config"
+	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/cthayer/remote_control/internal/config"
 	"github.com/cthayer/remote_control/internal/logger"
 	"github.com/cthayer/remote_control/internal/server"
 )
@@ -18,10 +20,8 @@ const (
 )
 
 var (
-	// #!/usr/bin/env bash
-	// version=2
-	// time=$(date)
-	// go build -ldflags="-X 'main.BuildTime=$time' -X 'main.VERSION=$version'" .
+	// set at build time using -ldflags=" -X 'main.VERSION=$version'"
+	//   - edit build/versions.json to set the version when building
 	VERSION = "dev"
 )
 
@@ -43,20 +43,33 @@ func runServer() {
 	log := logger.GetLogger()
 	defer log.Sync()
 
-	log.Info("Configuration Loaded")
+	log.Info("CLI Configuration Loaded")
+
+	if cliConf.PidFile != "" {
+		// write the main PID to the PidFile (for initV services)
+		err := writePidFile()
+
+		if err != nil {
+			// log the error, but otherwise ignore it
+			log.Error("Error writing PidFile", zap.Error(err), zap.String("pidFile", cliConf.PidFile))
+		}
+	}
 
 	conf := config.GetConfig()
-	
-	conf.Port =          cliConf.Port
-	conf.Host =          cliConf.Host
-	conf.CertDir =       cliConf.CertDir
-	conf.Ciphers =       cliConf.Ciphers
-	conf.PidFile =       cliConf.PidFile
-	conf.LogLevel =      cliConf.LogLevel
 
-	// start server
+	updateServerConfig(conf)
+
+	// create the server
 	srv := server.NewServer(conf)
 
+	// register for configuration updates
+	RegisterOnConfigReload(func() error {
+		updateServerConfig(conf)
+
+		return srv.OnConfigReload()
+	})
+
+	// start the server
 	errChan := srv.Start()
 
 	select {
@@ -99,6 +112,16 @@ func runServer() {
 	log.Info("Shutdown complete")
 }
 
+func updateServerConfig(conf *config.Config) {
+	conf.Port = cliConf.Port
+	conf.Host = cliConf.Host
+	conf.CertDir = cliConf.CertDir
+	conf.Ciphers = cliConf.Ciphers
+	conf.LogLevel = cliConf.LogLevel
+	conf.TlsKeyFile = cliConf.TlsKeyFile
+	conf.TlsCertFile = cliConf.TlsCertFile
+}
+
 func setupSignalHandler() chan bool {
 	log := logger.GetLogger()
 
@@ -125,4 +148,8 @@ func setupSignalHandler() chan bool {
 	}()
 
 	return done
+}
+
+func writePidFile() error {
+	return ioutil.WriteFile(cliConf.PidFile, []byte(strconv.Itoa(os.Getpid())), 0644)
 }

@@ -1,8 +1,11 @@
 package client
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"golang.org/x/tools/container/intsets"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,9 +20,10 @@ import (
 )
 
 const (
-	CLOSE_TIMEOUT    = 120
-	WEBSOCKET_SCHEME = "ws"
-	WEBSOCKET_PATH   = "/"
+	CLOSE_TIMEOUT        = 120
+	TLS_WEBSOCKET_SCHEME = "wss"
+	WEBSOCKET_SCHEME     = "ws"
+	WEBSOCKET_PATH       = "/"
 )
 
 var rcProto rc_protocol.RCProtocol = rc_protocol.NewRCProtocol()
@@ -42,11 +46,19 @@ type client struct {
 }
 
 func NewClient(conf config.Config) Client {
+	var u url.URL
+
+	if conf.TlsDisable {
+		u = url.URL{Scheme: WEBSOCKET_SCHEME, Host: conf.Host + ":" + strconv.Itoa(conf.Port), Path: WEBSOCKET_PATH}
+	} else {
+		u = url.URL{Scheme: TLS_WEBSOCKET_SCHEME, Host: conf.Host + ":" + strconv.Itoa(conf.Port), Path: WEBSOCKET_PATH}
+	}
+
 	c := client{
 		conf:         conf,
 		logger:       logger.GetLogger(),
 		isConnected:  false,
-		url:          url.URL{Scheme: WEBSOCKET_SCHEME, Host: conf.Host + ":" + strconv.Itoa(conf.Port), Path: WEBSOCKET_PATH},
+		url:          u,
 		readLoopDone: nil,
 		msgChannels:  map[int]chan rc_protocol.Response{},
 		msgId:        0,
@@ -71,7 +83,37 @@ func (c *client) Start() chan error {
 		// create authorization header
 		reqHeader := c.createSig()
 
-		c.socket, _, err = websocket.DefaultDialer.Dial(c.url.String(), reqHeader)
+		var dialer websocket.Dialer
+
+		if c.conf.TlsDisable {
+			// setup ws connection
+			dialer = *websocket.DefaultDialer
+		} else {
+			// setup wss connection
+			dialer = websocket.Dialer{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify:       c.conf.TlsSkipVerify,
+					PreferServerCipherSuites: true,
+				},
+			}
+
+			if c.conf.TlsCaFile != "" {
+				// load the CA file
+				caCert, err := ioutil.ReadFile(c.conf.TlsCaFile)
+
+				if err != nil {
+					c.logger.Error("Error reading ca certificate", zap.Error(err), zap.Any("caFile", c.conf.TlsCaFile))
+					errChan <- err
+					return
+				}
+
+				dialer.TLSClientConfig.RootCAs = x509.NewCertPool()
+				dialer.TLSClientConfig.RootCAs.AppendCertsFromPEM(caCert)
+			}
+		}
+
+		// connect to server
+		c.socket, _, err = dialer.Dial(c.url.String(), reqHeader)
 
 		if err != nil {
 			c.logger.Error("Failed to connect to server.", zap.String("url", c.url.String()), zap.Error(err))

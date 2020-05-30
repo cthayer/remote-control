@@ -23,6 +23,8 @@ func TestNewClient(t *testing.T) {
 func TestClient_Start_Stop_No_Auth(t *testing.T) {
 	conf := config.GetConfig()
 
+	conf.TlsDisable = true
+
 	client := NewClient(*conf)
 
 	srv, _ := startServer(t)
@@ -112,6 +114,7 @@ func startClient(t *testing.T) (*Client, error) {
 
 	conf.KeyName = "client"
 	conf.KeyDir = filepath.Join("..", "..", "test", "client", "keys")
+	conf.TlsDisable = true
 
 	client := NewClient(*conf)
 
@@ -165,6 +168,11 @@ func stopServer(t *testing.T, server *server.Server) {
 }
 
 func validateResponse(t *testing.T, cmd *rc_protocol.Response, expectedStdout string, expectedStderr string, expectedExitCode int) {
+	if cmd == nil {
+		t.Errorf("cmd is <nil>")
+		return
+	}
+
 	if cmd.ExitCode != expectedExitCode {
 		t.Errorf("cmd.Run() = failed, exitcode: %v != %v, stdout: %s, stderr: %s", cmd.ExitCode, expectedExitCode, cmd.Stdout, cmd.Stderr)
 	}

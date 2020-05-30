@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,11 +25,13 @@ const (
 	COMMAND_QUEUE_MAX_BACKLOG = 5
 	MAX_CONCURRENT_COMMANDS   = 5
 	HTTP_SERVER_STOP_TIMEOUT  = 300 //5 minutes are allowed to stop the http server
+	TLS_MIN_VERSION           = tls.VersionTLS12
 )
 
 type Server interface {
 	Start() chan error
 	Stop() chan error
+	OnConfigReload() error
 }
 
 type server struct {
@@ -42,6 +46,7 @@ type server struct {
 	waitGroup          sync.WaitGroup
 	shutdown           chan struct{}
 	cmdWorkerWaitGroup sync.WaitGroup
+	useTls             bool
 }
 
 type commandQueue struct {
@@ -71,6 +76,7 @@ func NewServer(conf *config.Config) Server {
 		waitGroup:          sync.WaitGroup{},
 		shutdown:           make(chan struct{}),
 		cmdWorkerWaitGroup: sync.WaitGroup{},
+		useTls:             conf.TlsCertFile != "" && conf.TlsKeyFile != "",
 	}
 
 	return &srv
@@ -82,14 +88,20 @@ func (s *server) Start() chan error {
 	errChan := make(chan error, 1)
 	s.shutdown = make(chan struct{})
 
+	if s.useTls {
+		err = s.setupTls()
+
+		if err != nil {
+			errChan <- err
+			close(errChan)
+			return errChan
+		}
+	}
+
 	// start the server async
 	s.waitGroup.Add(1)
 	go func() {
-		// start the command processing loop
-		s.waitGroup.Add(1)
-		go s.runCommands()
-
-		s.logger.Debug("Command processing go routine started")
+		defer s.waitGroup.Done()
 
 		s.router.HandleFunc("/", s.handler)
 		s.httpSrv.Handler = s.router
@@ -103,17 +115,25 @@ func (s *server) Start() chan error {
 			return
 		}
 
-		s.logger.Info("Server started", zap.String("listen address", s.httpSrv.Addr))
+		s.logger.Info("Server listening", zap.String("listen address", s.httpSrv.Addr))
+
+		// start the command processing loop
+		s.waitGroup.Add(1)
+		go s.runCommands()
+
+		s.logger.Debug("Command processing go routine started")
 
 		// this will block until the server is stopped or an error occurs
-		err = s.httpSrv.Serve(s.netListener)
+		if s.useTls {
+			err = s.httpSrv.ServeTLS(s.netListener, "", "")
+		} else {
+			err = s.httpSrv.Serve(s.netListener)
+		}
 
 		// if the server exits for any reason other than being stopped, log the error
 		if err != http.ErrServerClosed {
 			s.logger.Error("Error serving requests", zap.Error(err))
 		}
-
-		s.waitGroup.Done()
 	}()
 
 	return errChan
@@ -145,6 +165,10 @@ func (s *server) Stop() chan error {
 	}()
 
 	return errChan
+}
+
+func (s *server) OnConfigReload() error {
+	return s.setupTls()
 }
 
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
@@ -315,4 +339,50 @@ func (s *server) commandWorker(workerId int) {
 
 		s.logger.Debug("Finished running command", zap.Any("command", c), zap.Int("workerId", workerId))
 	}
+}
+
+func (s *server) setupTls() error {
+	keyPair, err := tls.LoadX509KeyPair(s.conf.TlsCertFile, s.conf.TlsKeyFile)
+
+	if err != nil {
+		return err
+	}
+
+	if s.httpSrv.TLSConfig == nil {
+		s.httpSrv.TLSConfig = &tls.Config{}
+		s.httpSrv.TLSConfig.PreferServerCipherSuites = true
+		s.httpSrv.TLSConfig.MinVersion = TLS_MIN_VERSION
+	}
+
+	if s.httpSrv.TLSConfig.Certificates == nil {
+		s.httpSrv.TLSConfig.Certificates = make([]tls.Certificate, 1)
+	}
+
+	s.httpSrv.TLSConfig.Certificates[0] = keyPair
+
+	// load ciphers
+	var cipherIds []uint16
+	cipherNames := strings.Split(s.conf.Ciphers, ":")
+
+	for _, cipher := range tls.CipherSuites() {
+		for _, cn := range cipherNames {
+			if cn == cipher.Name {
+				cipherIds = append(cipherIds, cipher.ID)
+			}
+		}
+	}
+
+	// allow insecure ciphers to be specified, but log warnings when using them
+	for _, cipher := range tls.InsecureCipherSuites() {
+		for _, cn := range cipherNames {
+			if cn == cipher.Name {
+				s.logger.Warn("Allowing insecure TLS cipher", zap.String("cipher", cipher.Name))
+				cipherIds = append(cipherIds, cipher.ID)
+			}
+		}
+	}
+
+	s.httpSrv.TLSConfig.CipherSuites = cipherIds
+
+	return nil
 }

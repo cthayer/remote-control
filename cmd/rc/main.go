@@ -176,7 +176,7 @@ func writeResponse(host string, resp *rc_protocol.Response, err error) {
 		return
 	}
 
-	if cliConf.Verbose != 0 {
+	if cliConf.Verbose {
 		// print the raw response object
 		jsonStr, err := json.Marshal(resp)
 
@@ -201,11 +201,14 @@ func sendCommand(host string, command string, tryCount int) (*rc_protocol.Respon
 	log := logger.GetLogger()
 
 	conf := config.Config{
-		Port:     cliConf.Port,
-		Host:     host,
-		KeyDir:   cliConf.KeyDir,
-		KeyName:  cliConf.KeyName,
-		LogLevel: cliConf.LogLevel,
+		Port:          cliConf.Port,
+		Host:          host,
+		KeyDir:        cliConf.KeyDir,
+		KeyName:       cliConf.KeyName,
+		LogLevel:      cliConf.LogLevel,
+		TlsSkipVerify: cliConf.TlsSkipVerify,
+		TlsCaFile:     cliConf.TlsCaFile,
+		TlsDisable:    cliConf.TlsDisable,
 	}
 
 	conn := client.NewClient(conf)

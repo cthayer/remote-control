@@ -68,6 +68,8 @@ func startServer(t *testing.T) (*Server, error) {
 	conf := config.GetConfig()
 
 	conf.CertDir = filepath.Join("..", "..", "test", "server", "certs")
+	conf.TlsCertFile = filepath.Join("..", "..", "test", "ca", "server.pem")
+	conf.TlsKeyFile = filepath.Join("..", "..", "test", "ca", "server-key.pem")
 
 	server := NewServer(conf)
 
@@ -98,6 +100,7 @@ func sendMessage(t *testing.T, command string, msgOptions rc_protocol.MessageOpt
 	clientConf := client_config.GetConfig()
 	clientConf.KeyDir = filepath.Join("..", "..", "test", "client", "keys")
 	clientConf.KeyName = "client"
+	clientConf.TlsCaFile = filepath.Join("..", "..", "test", "ca", "ca.pem")
 
 	client := client.NewClient(*clientConf)
 	defer client.Stop()
@@ -123,6 +126,11 @@ func sendMessage(t *testing.T, command string, msgOptions rc_protocol.MessageOpt
 }
 
 func validateResponse(t *testing.T, cmd *rc_protocol.Response, expectedStdout string, expectedStderr string, expectedExitCode int) {
+	if cmd == nil {
+		t.Errorf("cmd is <nil>")
+		return
+	}
+
 	if cmd.ExitCode != expectedExitCode {
 		t.Errorf("cmd.Run() = failed, exitcode: %v != %v, stdout: %s, stderr: %s", cmd.ExitCode, expectedExitCode, cmd.Stdout, cmd.Stderr)
 	}

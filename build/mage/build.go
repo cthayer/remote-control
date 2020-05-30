@@ -52,7 +52,7 @@ func buildBinary(target string, version string) error {
 	fmt.Println("building binary: " + target)
 
 	cmdArgs := []string{
-		"-output", filepath.Join(buildRoot, "{{.OS}}_{{.Arch}}_" + version, "{{.Dir}}"),
+		"-output", filepath.Join(buildRoot, "{{.OS}}_{{.Arch}}_"+version, "{{.Dir}}"),
 		"-ldflags", "-X 'main.VERSION=" + version + "'",
 		"-osarch", strings.Join(buildOsArchs, " "),
 		"./cmd/" + target,
@@ -84,7 +84,7 @@ func getBinarySha256Sum(target string, version string) error {
 		}
 
 		binaryName := filepath.Join(buildRoot, strings.Join([]string{os, arch, version}, "_"), target)
-		shaFileName := filepath.Join(buildRoot, strings.Join([]string{target, version, os, arch}, "_") + SHA256_CHECKSUM_FILE_EXTENSION)
+		shaFileName := filepath.Join(buildRoot, strings.Join([]string{target, version, os, arch}, "_")+SHA256_CHECKSUM_FILE_EXTENSION)
 
 		if os == "windows" {
 			binaryName = binaryName + ".exe"
@@ -169,7 +169,7 @@ func compressBinary(target string, version string) error {
 			continue
 		}
 
-		zipFile := filepath.Join(buildRoot, strings.Join([]string{target, version, os, arch}, "_") + ".zip")
+		zipFile := filepath.Join(buildRoot, strings.Join([]string{target, version, os, arch}, "_")+".zip")
 		zipContent := filepath.Join(buildRoot, strings.Join([]string{os, arch, version}, "_"), target)
 
 		if os == "windows" {
