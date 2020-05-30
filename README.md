@@ -114,11 +114,9 @@ The configuration file understands the following options:
 * `host`: the interface to bind to (default: `::`)
 * `certDir`: the directory where authorized users' public keys are stored (default: `/etc/rc/certs`)
 * `ciphers`: the list of cyphers to use
-* `engineOptions`:
-    * `pingTimeout`: ping timeout in ms (default: `5000`)
-    * `pingInterval`: pint interval in ms (default: `1000`)
 * `pidFile`: the pid file to write (default: `null`)
-* `cmdOptions`: the options used by the child processes running the commands (default: `{}`).  Can be overriden by options set on the message.  See [`child_process_exec_command_options`](https://nodejs.org/api/child_process.html#child_process_child_process_exec_command_options_callback) for valid options
+* `tlsKeyFile`: the path to the private key to use for TLS
+* `tlsCertFile`: the path to the certificate to use for TLS
 
 The server authenticates clients by requiring that they provide a signature in the `Authorization` header on the initial upgrade request.
 
@@ -161,16 +159,9 @@ The configuration file understands the following options:
 * `delay`: the number of milliseconds to wait between batches (default: 0)
 * `verbose`: set to `1` to show the raw rc-protocol response from the server(s)
 * `retry`: the number of times to retry connecting to a server if the first attempt fails (default: 0)
-
-The server authenticates clients by requiring that they provide a signature in the `Authorization` header on the initial upgrade request.
-
-The signature header should be in the following format:
-
-`Authorization: RC <name>;<iso_8601_timestamp>;<signature>`
-
-* `<name>`: the server will verify the signature using a certificate stored in `<certDir>/<name>.key` on the server
-* `<iso_8601_timestamp>`: an `ISO-8601` formatted timestamp.  This is the data that has been signed
-* `<sig>`: a `RSA-SHA256` signature in `base64` format
+* `tls-skip-verify`: skip verification of the server certificate
+* `tls-disable`: don't use TLS when connecting to the server
+* `tls-ca-file`: the path to the ca certificate file to use
 
 ##### Environment Variables
 
