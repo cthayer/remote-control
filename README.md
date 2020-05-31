@@ -2,7 +2,8 @@ remote-control
 -------------------
 [![Go Report Card](https://goreportcard.com/badge/github.com/cthayer/remote-control?style=flat-square)](https://goreportcard.com/report/github.com/cthayer/remote-control)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/cthayer/remote-control)
-[![Release](https://img.shields.io/github/release/cthayer/remote-control.svg?style=flat-square)](https://github.com/cthayer/remote-control/releases/latest)
+[![Release](https://img.shields.io/badge/dynamic/json?color=blue&label=release&prefix=v&query=%24%5B%27remote-control%27%5D&suffix=-remote-control&url=https%3A%2F%2Fraw.githubusercontent.com%2Fcthayer%2Fremote-control%2Fmaster%2Fbuild%2Fversions.json)](https://github.com/cthayer/remote-control/releases/latest)
+[![Release](https://img.shields.io/badge/dynamic/json?color=blue&label=release&prefix=v&query=%24.rc&suffix=-rc&url=https%3A%2F%2Fraw.githubusercontent.com%2Fcthayer%2Fremote-control%2Fmaster%2Fbuild%2Fversions.json)](https://github.com/cthayer/remote-control/releases/latest)
 
 This is a service that allows command line commands to be run on the host it is running on.
 
