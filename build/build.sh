@@ -11,6 +11,6 @@ fi
 SCRIPT_DIR=$(dirname "$0")
 
 # get the version
-export VERSION=$(cat $SCRIPT_DIR/versions.json | jq -r ".$TARGET")
+export VERSION=$(cat $SCRIPT_DIR/versions.json | jq -r ".\"$TARGET\"")
 
 mage build
