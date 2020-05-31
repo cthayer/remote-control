@@ -58,7 +58,7 @@ var onConfigUpdateFuncs []func() error = make([]func() error, 0)
 func init() {
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.ConfigFile, "config-file", "c", DEFAULT_CLI_CONF_CONFIG_FILE, "path to JSON formatted configuration file")
 	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Port, "port", "p", config.DEFAULT_PORT, "port to listen on")
-	cliRootCmd.PersistentFlags().IntVarP(&cliConf.Port, "host", "H", config.DEFAULT_HOST, "the interface to bind to")
+	cliRootCmd.PersistentFlags().StringVarP(&cliConf.Host, "host", "H", config.DEFAULT_HOST, "the interface to bind to")
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.CertDir, "cert-dir", "d", config.DEFAULT_CERT_DIR, "path to the folder that contains authorized client public keys")
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.Ciphers, "ciphers", "", config.DEFAULT_CIPHERS, "the list of ciphers to use for TLS encryption")
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.LogLevel, "log-level", "", config.DEFAULT_LOG_LEVEL, "the loglevel.  can be one of: error, warn, info, debug")
