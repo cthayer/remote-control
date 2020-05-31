@@ -1,4 +1,4 @@
 {
-  "rc": "foo",
-  "remote-control": "bar"
+  "rc": "1.0.0",
+  "remote-control": "1.0.0"
 }
