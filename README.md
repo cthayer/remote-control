@@ -1,8 +1,8 @@
 remote-control
 -------------------
-[![Go Report Card](https://goreportcard.com/badge/github.com/cthayer/go-remote-control?style=flat-square)](https://goreportcard.com/report/github.com/cthayer/go-remote-control)
-[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/cthayer/go-remote-control)
-[![Release](https://img.shields.io/github/release/cthayer/go-remote-control.svg?style=flat-square)](https://github.com/cthayer/go-remote-control/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cthayer/remote-control?style=flat-square)](https://goreportcard.com/report/github.com/cthayer/remote-control)
+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/github.com/cthayer/remote-control)
+[![Release](https://img.shields.io/github/release/cthayer/remote-control.svg?style=flat-square)](https://github.com/cthayer/remote-control/releases/latest)
 
 This is a service that allows command line commands to be run on the host it is running on.
 
@@ -71,7 +71,7 @@ Installation
 
 ### Server
 
-* Download the `remote-control` zip archive appropriate for your system from the [releases](https://github.com/cthayer/go-remote-control/releases)
+* Download the `remote-control` zip archive appropriate for your system from the [releases](https://github.com/cthayer/remote-control/releases)
 * Unzip the archive.  This will produce a binary file named `remote-control`
 * (optional) Verify the file's SHA256 checksum
 * (optional) Move the `remote-control` file to `/usr/local/bin` or a well-known path for executables that's platform appropriate.
@@ -134,7 +134,7 @@ All options from the configuration file can be passed as environment variables b
 
 ### Client
 
-* Download the `rc` zip archive appropriate for your system from the [releases](https://github.com/cthayer/go-remote-control/releases)
+* Download the `rc` zip archive appropriate for your system from the [releases](https://github.com/cthayer/remote-control/releases)
 * Unzip the archive.  This will produce a binary file named `rc`
 * (optional) Verify the file's SHA256 checksum
 * (optional) Move the `rc` file to `/usr/local/bin` or a well-known path for executables that's platform appropriate.
