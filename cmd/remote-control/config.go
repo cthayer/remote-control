@@ -65,7 +65,6 @@ func init() {
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.PidFile, "pid-file", "", DEFAULT_CLI_CONF_PID_FILE, "the file to write the pid to (used for initv style services")
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.TlsKeyFile, "tls-key-file", "", config.DEFAULT_TLS_KEY_FILE, "the path to the private key to use for TLS")
 	cliRootCmd.PersistentFlags().StringVarP(&cliConf.TlsCertFile, "tls-cert-file", "", config.DEFAULT_TLS_CERT_FILE, "the path to the certificate to use for TLS")
-	cliRootCmd.PersistentFlags().StringVarP(&cliConf.Host, "host", "H", config.DEFAULT_HOST, "the host address to bind to")
 
 	// Default configuration settings
 	viper.SetDefault("configFile", DEFAULT_CLI_CONF_CONFIG_FILE)
