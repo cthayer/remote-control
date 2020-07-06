@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	OS "os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -18,6 +19,8 @@ import (
 const (
 	SHA256_CHECKSUM_FILE_PERMS     = 0644
 	SHA256_CHECKSUM_FILE_EXTENSION = ".sha256.checksum"
+
+	BUILD_OS_ARCHES_ARM_PATTERN = "^arm(64)?v\\d+$"
 )
 
 var (
@@ -45,6 +48,14 @@ var (
 		"windows/amd64",
 	}
 
+	// builds that require a specific version of GOARM to be set
+	// (use "v" to separate the arch from the GOARM value)
+	buildOsArchsArm []string = []string{
+		"freebsd/armv5",
+		"linux/armv5",
+		"netbsd/armv5",
+	}
+
 	buildRoot string = filepath.Join("build", "bin")
 )
 
@@ -62,7 +73,55 @@ func buildBinary(target string, version string) error {
 
 	fmt.Println(out)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("building GOARM specific arm binaries: " + target)
+
+	for i := 0; i < len(buildOsArchsArm); i++ {
+		os, arch := splitOsArch(buildOsArchsArm[i])
+
+		if os == "" || arch == "" {
+			fmt.Println("skipping " + buildOsArchsArm[i])
+			continue
+		}
+
+		if match, err := regexp.Match(BUILD_OS_ARCHES_ARM_PATTERN, []byte(arch)); !match || err != nil {
+			fmt.Println("skipping " + buildOsArchsArm[i])
+			continue
+		}
+
+		armArch, goArm := splitArmArch(arch)
+
+		if armArch == "" || goArm == "" {
+			fmt.Println("skipping " + buildOsArchsArm[i])
+			continue
+		}
+
+		fmt.Println("building " + buildOsArchsArm[i])
+
+		cmdArgs := []string{
+			"-output", filepath.Join(buildRoot, "{{.OS}}_{{.Arch}}v" + goArm + "_"+version, "{{.Dir}}"),
+			"-ldflags", "-X 'main.VERSION=" + version + "'",
+			"-osarch", strings.Join([]string{os, armArch}, "/"),
+			"./cmd/" + target,
+		}
+
+		env := make(map[string]string)
+
+		env["GOARM"] = goArm
+
+		out, err := sh.OutputWith(env,"gox", cmdArgs...)
+
+		fmt.Println(out)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getBinarySha256Sum(target string, version string) error {
@@ -71,11 +130,13 @@ func getBinarySha256Sum(target string, version string) error {
 
 	fmt.Println("calculating Sha256 sums for binary: " + target)
 
-	waitGroup := sync.WaitGroup{}
-	outChan := make(chan string, len(buildOsArchs))
-	errChan := make(chan error, len(buildOsArchs))
+	osArchs := append(buildOsArchs, buildOsArchsArm...)
 
-	for _, osarch := range buildOsArchs {
+	waitGroup := sync.WaitGroup{}
+	outChan := make(chan string, len(osArchs))
+	errChan := make(chan error, len(osArchs))
+
+	for _, osarch := range osArchs {
 		os, arch := splitOsArch(osarch)
 
 		if os == "" || arch == "" {
@@ -156,11 +217,13 @@ func compressBinary(target string, version string) error {
 
 	fmt.Println("compressing binary: " + target)
 
-	waitGroup := sync.WaitGroup{}
-	outChan := make(chan string, len(buildOsArchs))
-	errChan := make(chan error, len(buildOsArchs))
+	osArchs := append(buildOsArchs, buildOsArchsArm...)
 
-	for _, osarch := range buildOsArchs {
+	waitGroup := sync.WaitGroup{}
+	outChan := make(chan string, len(osArchs))
+	errChan := make(chan error, len(osArchs))
+
+	for _, osarch := range osArchs {
 		os, arch := splitOsArch(osarch)
 
 		if os == "" || arch == "" {
@@ -226,5 +289,19 @@ func compressBinary(target string, version string) error {
 func splitOsArch(osarch string) (os string, arch string) {
 	osarchParts := strings.Split(osarch, "/")
 
+	if len(osarchParts) != 2 {
+		return "", ""
+	}
+
 	return osarchParts[0], osarchParts[1]
+}
+
+func splitArmArch(armArch string) (arch string, goarm string) {
+	armArchParts := strings.Split(armArch, "v")
+
+	if len(armArchParts) != 2 {
+		return "", ""
+	}
+
+	return armArchParts[0], armArchParts[1]
 }
